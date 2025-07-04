@@ -1,6 +1,7 @@
 # LSTCalculator
-simple web app to calculate Local Siderial Time from your location. 
+simple web app to calculate Local Siderial Time from your location. You can run it here as a web app by going to:
 
+https://vincentjgeisler.github.io/LSTCalculator/
 
 Local Sidereal Time (LST) Calculator for Celestron Compustar
 Purpose
