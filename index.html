@@ -138,6 +138,7 @@
   <script>
     let updateInterval = null;
     let currentLongitude = null;
+    let currentLatitude = null; // Only used when geolocation is used
 
     // Function to calculate GMST with J2000 epoch
     const calculateGMST_J2000 = (date) => {
@@ -205,8 +206,20 @@
       const autoUpdate = document.getElementById("auto-update").checked;
       const currentTime = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
       
+      let locationInfo = '';
+      if (currentLatitude !== null) {
+        // Show both coordinates when using geolocation
+        locationInfo = `
+          <p>Your Latitude: ${currentLatitude.toFixed(6)}°</p>
+          <p>Your Longitude: ${longitude.toFixed(6)}°</p>
+        `;
+      } else {
+        // Show only longitude when manually entered
+        locationInfo = `<p>Your Longitude: ${longitude.toFixed(6)}°</p>`;
+      }
+      
       outputDiv.innerHTML = `
-        <p>Your Longitude: ${longitude.toFixed(6)}°</p>
+        ${locationInfo}
         <p>Current Time: ${currentTime}</p>
         <p>GMST: ${formatTime(gmst)}</p>
         <p>LST: ${formatTime(lst)}</p>
@@ -254,7 +267,8 @@
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            currentLongitude = position.coords.longitude; // Get longitude
+            currentLatitude = position.coords.latitude; // Store latitude from geolocation
+            currentLongitude = position.coords.longitude; // Store longitude from geolocation
             document.getElementById("manual-longitude").value = currentLongitude.toFixed(6);
             manageUpdates();
           },
@@ -284,6 +298,7 @@
         return;
       }
 
+      currentLatitude = null; // Clear latitude when manually entering coordinates
       currentLongitude = manualLongitude;
       manageUpdates();
     });
