@@ -168,6 +168,7 @@
       font-size: 1.1em;
     }
 
+    /* Layout toggle styles - desktop only */
     .layout-toggle {
       position: fixed;
       top: 20px;
@@ -186,12 +187,9 @@
       background: rgba(153, 0, 0, 0.8);
     }
 
+    /* Hide toggle completely on mobile - auto-detection is good enough */
     body.mobile-layout .layout-toggle {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      padding: 10px 15px;
-      font-size: 1em;
+      display: none;
     }
 
     /* Better spacing for mobile */
@@ -212,6 +210,11 @@
       p {
         font-size: 1em;
         padding: 0 15px;
+      }
+
+      /* Hide toggle completely on small screens */
+      .layout-toggle {
+        display: none;
       }
     }
   </style>
