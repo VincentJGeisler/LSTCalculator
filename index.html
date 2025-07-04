@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LST Calculator</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #000000; /* Pure black for night vision */
+      color: #ff4d4d; /* Soft red text */
+      text-align: center;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      margin-bottom: 20px;
+      color: #ff6666;
+      text-shadow: 0px 0px 10px #ff3333;
+    }
+
+    p {
+      font-size: 1.2em;
+      margin-bottom: 20px;
+      color: #ff4d4d;
+    }
+
+    input, button {
+      font-size: 1.1em;
+      padding: 10px;
+      margin: 10px;
+      border-radius: 5px;
+      border: 1px solid #ff4d4d;
+    }
+
+    button {
+      background-color: #660000;
+      color: #ff4d4d;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #990000;
+    }
+
+    #output {
+      margin-top: 20px;
+      font-size: 1.2em;
+    }
+
+    .error {
+      color: #ff9999;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔭 Local Sidereal Time Calculator 🔭</h1>
+  <p>You can manually input your longitude or let us detect your location to calculate Local Sidereal Time (LST).</p>
+
+  <!-- Button for using browser location -->
+  <div>
+    <button id="use-location">Use My Location</button>
+  </div>
+
+  <!-- Manual longitude input -->
+  <div>
+    <input type="number" id="manual-longitude" placeholder="Enter Longitude (e.g., -75.0)" />
+    <button id="calculate-manual">Calculate</button>
+  </div>
+
+  <div id="output"></div>
+
+  <script>
+    // Function to calculate GMST
+    const calculateGMST = (date) => {
+      const JD = (date.getTime() / 86400000.0) + 2440587.5; // Julian Date
+      const D = JD - 2451545.0; // Days since J2000.0
+      const GMST = 18.697374558 + 24.06570982441908 * D; // GMST in hours
+      return GMST % 24; // Normalize to 0-24 hours
+    };
+
+    // Function to calculate LST
+    const calculateLST = (gmst, longitude) => {
+      const longitudeInHours = longitude / 15; // Convert degrees to hours
+      let lst = gmst + longitudeInHours;
+      if (lst < 0) lst += 24; // Normalize to 0-24 hours
+      if (lst >= 24) lst -= 24;
+      return lst;
+    };
+
+    // Format time in HH:MM.m
+    const formatTime = (hours) => {
+      const h = Math.floor(hours);
+      const m = Math.floor((hours - h) * 60);
+      const decimalMinutes = (hours - h) * 60;
+      const fractionOfMinute = decimalMinutes - m;
+      const mWithFraction = m + fractionOfMinute;
+      return `${h.toString().padStart(2, '0')}:${mWithFraction.toFixed(1).padStart(4, '0')}`;
+    };
+
+    // Display output
+    const displayOutput = (longitude, gmst, lst) => {
+      const outputDiv = document.getElementById("output");
+      outputDiv.innerHTML = `
+        <p>Your Longitude: ${longitude.toFixed(2)}°</p>
+        <p>GMST: ${formatTime(gmst)}</p>
+        <p>LST: ${formatTime(lst)}</p>
+      `;
+    };
+
+    // Event listener for "Use My Location" button
+    document.getElementById("use-location").addEventListener("click", () => {
+      const outputDiv = document.getElementById("output");
+      outputDiv.innerHTML = ""; // Clear output
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const longitude = position.coords.longitude; // Get longitude
+            const gmst = calculateGMST(new Date()); // Get current GMST
+            const lst = calculateLST(gmst, longitude); // Calculate LST
+
+            // Display results
+            displayOutput(longitude, gmst, lst);
+          },
+          (error) => {
+            // Handle geolocation errors
+            let errorMessage = "Error fetching location.";
+            if (error.code === 1) errorMessage = "Permission denied. Please enable location access.";
+            if (error.code === 2) errorMessage = "Position unavailable. Please check your connection.";
+            if (error.code === 3) errorMessage = "Request timeout. Try again.";
+            outputDiv.innerHTML = `<p class="error">${errorMessage}</p>`;
+          }
+        );
+      } else {
+        outputDiv.innerHTML = '<p class="error">Geolocation is not supported by your browser.</p>';
+      }
+    });
+
+    // Event listener for manual longitude input
+    document.getElementById("calculate-manual").addEventListener("click", () => {
+      const outputDiv = document.getElementById("output");
+      outputDiv.innerHTML = ""; // Clear output
+
+      const manualLongitude = parseFloat(document.getElementById("manual-longitude").value);
+      if (isNaN(manualLongitude) || manualLongitude < -180 || manualLongitude > 180) {
+        outputDiv.innerHTML = '<p class="error">Please enter a valid longitude between -180 and 180 degrees.</p>';
+        return;
+      }
+
+      const gmst = calculateGMST(new Date());
+      const lst = calculateLST(gmst, manualLongitude);
+      displayOutput(manualLongitude, gmst, lst);
+    });
+  </script>
+</body>
+</html>
