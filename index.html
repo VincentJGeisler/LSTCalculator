@@ -40,6 +40,11 @@
       border: 1px solid #ff4d4d;
     }
 
+    input[type="number"] {
+      background-color: #000000;
+      color: #ff4d4d;
+    }
+
     button {
       background-color: #660000;
       color: #ff4d4d;
@@ -58,11 +63,63 @@
     .error {
       color: #ff9999;
     }
+
+    .checkbox-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 15px 0;
+      gap: 10px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1em;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: #ff4d4d;
+    }
+
+    .checkbox-row label {
+      color: #ff4d4d;
+      cursor: pointer;
+    }
+
+    .update-status {
+      font-size: 0.9em;
+      color: #ff9999;
+      margin-top: 10px;
+      font-style: italic;
+    }
+
+    .epoch-display {
+      font-size: 0.9em;
+      color: #ff6666;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
   <h1>🔭 Local Sidereal Time Calculator 🔭</h1>
   <p>You can manually input your longitude or let us detect your location to calculate Local Sidereal Time (LST).</p>
+
+  <!-- Checkbox options -->
+  <div class="checkbox-container">
+    <div class="checkbox-row">
+      <input type="checkbox" id="use-j2000" checked>
+      <label for="use-j2000">Use J2000.0 epoch (uncheck for Jnow/current epoch)</label>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="auto-update" checked>
+      <label for="auto-update">Continuous updates (updates every second)</label>
+    </div>
+  </div>
 
   <!-- Button for using browser location -->
   <div>
@@ -73,17 +130,53 @@
   <div>
     <input type="number" id="manual-longitude" placeholder="Enter Longitude (e.g., -75.0)" />
     <button id="calculate-manual">Calculate</button>
+    <button id="stop-updates">Stop Updates</button>
   </div>
 
   <div id="output"></div>
 
   <script>
-    // Function to calculate GMST
-    const calculateGMST = (date) => {
+    let updateInterval = null;
+    let currentLongitude = null;
+
+    // Function to calculate GMST with J2000 epoch
+    const calculateGMST_J2000 = (date) => {
       const JD = (date.getTime() / 86400000.0) + 2440587.5; // Julian Date
       const D = JD - 2451545.0; // Days since J2000.0
       const GMST = 18.697374558 + 24.06570982441908 * D; // GMST in hours
       return GMST % 24; // Normalize to 0-24 hours
+    };
+
+    // Function to calculate GMST with current epoch (Jnow)
+    const calculateGMST_Jnow = (date) => {
+      const JD = (date.getTime() / 86400000.0) + 2440587.5; // Julian Date
+      const T = (JD - 2451545.0) / 36525.0; // Julian centuries since J2000.0
+      
+      // More precise GMST calculation for current epoch
+      let GMST = 280.46061837 + 360.98564736629 * (JD - 2451545.0) + 
+                 0.000387933 * T * T - T * T * T / 38710000.0;
+      
+      // Additional corrections for current epoch
+      const L = 280.4665 + 36000.7698 * T;
+      const omega = 125.04 - 1934.136 * T;
+      const epsilon = 23.4393 - 0.0130 * T;
+      
+      // Nutation correction
+      const deltaPsi = -17.20 * Math.sin(omega * Math.PI / 180) / 3600;
+      const correction = deltaPsi * Math.cos(epsilon * Math.PI / 180);
+      GMST += correction;
+      
+      // Convert to hours and normalize
+      GMST = (GMST / 15.0) % 24;
+      if (GMST < 0) GMST += 24;
+      
+      return GMST;
+    };
+
+    // Function to calculate GMST based on selected epoch
+    const calculateGMST = (date) => {
+      const useJ2000 = document.getElementById("use-j2000").checked;
+      return useJ2000 ? calculateGMST_J2000(date) : calculateGMST_Jnow(date);
     };
 
     // Function to calculate LST
@@ -108,27 +201,62 @@
     // Display output
     const displayOutput = (longitude, gmst, lst) => {
       const outputDiv = document.getElementById("output");
+      const useJ2000 = document.getElementById("use-j2000").checked;
+      const autoUpdate = document.getElementById("auto-update").checked;
+      const currentTime = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+      
       outputDiv.innerHTML = `
-        <p>Your Longitude: ${longitude.toFixed(2)}°</p>
+        <p>Your Longitude: ${longitude.toFixed(6)}°</p>
+        <p>Current Time: ${currentTime}</p>
         <p>GMST: ${formatTime(gmst)}</p>
         <p>LST: ${formatTime(lst)}</p>
+        <div class="epoch-display">Epoch: ${useJ2000 ? 'J2000.0' : 'Jnow (Current)'}</div>
+        ${autoUpdate ? '<div class="update-status">🔄 Updating continuously...</div>' : '<div class="update-status">📷 Static calculation</div>'}
       `;
+    };
+
+    // Function to update display
+    const updateDisplay = () => {
+      if (currentLongitude === null) return;
+      
+      const gmst = calculateGMST(new Date());
+      const lst = calculateLST(gmst, currentLongitude);
+      displayOutput(currentLongitude, gmst, lst);
+    };
+
+    // Function to start/stop continuous updates
+    const manageUpdates = () => {
+      stopUpdates();
+      
+      if (currentLongitude !== null) {
+        updateDisplay();
+        
+        if (document.getElementById("auto-update").checked) {
+          updateInterval = setInterval(updateDisplay, 1000);
+        }
+      }
+    };
+
+    // Function to stop updates
+    const stopUpdates = () => {
+      if (updateInterval) {
+        clearInterval(updateInterval);
+        updateInterval = null;
+      }
     };
 
     // Event listener for "Use My Location" button
     document.getElementById("use-location").addEventListener("click", () => {
       const outputDiv = document.getElementById("output");
       outputDiv.innerHTML = ""; // Clear output
+      stopUpdates();
 
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            const longitude = position.coords.longitude; // Get longitude
-            const gmst = calculateGMST(new Date()); // Get current GMST
-            const lst = calculateLST(gmst, longitude); // Calculate LST
-
-            // Display results
-            displayOutput(longitude, gmst, lst);
+            currentLongitude = position.coords.longitude; // Get longitude
+            document.getElementById("manual-longitude").value = currentLongitude.toFixed(6);
+            manageUpdates();
           },
           (error) => {
             // Handle geolocation errors
@@ -148,6 +276,7 @@
     document.getElementById("calculate-manual").addEventListener("click", () => {
       const outputDiv = document.getElementById("output");
       outputDiv.innerHTML = ""; // Clear output
+      stopUpdates();
 
       const manualLongitude = parseFloat(document.getElementById("manual-longitude").value);
       if (isNaN(manualLongitude) || manualLongitude < -180 || manualLongitude > 180) {
@@ -155,10 +284,31 @@
         return;
       }
 
-      const gmst = calculateGMST(new Date());
-      const lst = calculateLST(gmst, manualLongitude);
-      displayOutput(manualLongitude, gmst, lst);
+      currentLongitude = manualLongitude;
+      manageUpdates();
     });
+
+    // Event listener for stop updates button
+    document.getElementById("stop-updates").addEventListener("click", () => {
+      stopUpdates();
+      if (currentLongitude !== null) {
+        updateDisplay();
+      }
+    });
+
+    // Event listeners for checkbox changes
+    document.getElementById("use-j2000").addEventListener("change", () => {
+      if (currentLongitude !== null) {
+        manageUpdates();
+      }
+    });
+
+    document.getElementById("auto-update").addEventListener("change", () => {
+      manageUpdates();
+    });
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', stopUpdates);
   </script>
 </body>
 </html>
